@@ -1,0 +1,185 @@
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+ 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Mapper.Context;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.Reducer;
+
+ 
+/**
+ * WordFrequenceInDocMapper implements the Job 1 specification for the TF-IDF algorithm
+ */
+public class ReqWordCount
+{
+	private static Set<String> googleStopwords;
+	 
+    static {
+        googleStopwords = new HashSet<String>();
+        googleStopwords.add("I"); googleStopwords.add("a");
+        googleStopwords.add("about"); googleStopwords.add("an");
+        googleStopwords.add("are"); googleStopwords.add("as");
+        googleStopwords.add("at"); googleStopwords.add("be");
+        googleStopwords.add("by"); googleStopwords.add("com");
+        googleStopwords.add("de"); googleStopwords.add("en");
+        googleStopwords.add("for"); googleStopwords.add("from");
+        googleStopwords.add("how"); googleStopwords.add("in");
+        googleStopwords.add("is"); googleStopwords.add("it");
+        googleStopwords.add("la"); googleStopwords.add("of");
+        googleStopwords.add("on"); googleStopwords.add("or");
+        googleStopwords.add("that"); googleStopwords.add("the");
+        googleStopwords.add("this"); googleStopwords.add("to");
+        googleStopwords.add("was"); googleStopwords.add("what");
+        googleStopwords.add("when"); googleStopwords.add("where");
+        googleStopwords.add("who"); googleStopwords.add("will");
+        googleStopwords.add("with"); googleStopwords.add("and");
+        googleStopwords.add("the"); googleStopwords.add("www");
+        googleStopwords.add("with"); googleStopwords.add("had");
+        googleStopwords.add("the"); googleStopwords.add("have");
+        googleStopwords.add("this"); googleStopwords.add("is");
+        googleStopwords.add("was"); googleStopwords.add("am");
+        googleStopwords.add("when"); googleStopwords.add("are");
+        googleStopwords.add("who"); googleStopwords.add("was");														
+        googleStopwords.add("with"); googleStopwords.add("were");
+        googleStopwords.add("the"); googleStopwords.add("has");
+        
+        
+    }
+public static class WordFrequenceInDocMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
+ 
+    public WordFrequenceInDocMapper()
+    {
+    	
+    }
+    /**
+     * Google's search Stopwords
+     */
+    
+ 
+    /**
+     * @param key is the byte offset of the current line in																																																																																																		
+     * lld the file;
+     * @param value is the line from the file
+     * @param output has the method "collect()" to output the key,value pair
+     * @param reporter allows us to retrieve some information about the job (like the current filename)
+     *
+     *     POST-CONDITION: Output <"word", "filename@offset"> pairs
+     */
+    public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+    	
+    	Scanner scanner = new Scanner(value.toString());
+        while (scanner.hasNextLine()) {
+          String line = scanner.nextLine();
+          // process the line using String#split function
+          String arrLine[]=line.split("!#%");
+          // Compile all the words using regex
+          Pattern p = Pattern.compile("\\w+");
+          Matcher m = p.matcher(arrLine[2]);
+          
+          
+   
+          // Get the name of the file from the inputsplit in the context
+          //String fileName = ((FileSplit) context.getInputSplit()).getPath().getName();
+   
+          // build the values and write <k,v> pairs through the context
+          
+          while (m.find()) {
+        	  StringBuilder valueBuilder = new StringBuilder();
+              String matchedKey = m.group().toLowerCase();
+              // remove names starting with non letters, digits, considered stopwords or containing other chars
+              if (!Character.isLetter(matchedKey.charAt(0)) || Character.isDigit(matchedKey.charAt(0))
+                      || googleStopwords.contains(matchedKey) || matchedKey.contains("_")) {
+                  continue;
+              }
+              valueBuilder.append(matchedKey);
+              valueBuilder.append("@");
+              valueBuilder.append(arrLine[0]);
+              // emit the partial <k,v>
+              context.write(new Text(valueBuilder.toString()), new IntWritable(1));
+          }
+          
+        }
+    	
+    	
+    }
+}
+public static class WordFrequenceInDocReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+	
+ public WordFrequenceInDocReducer()
+ {
+	 
+ }
+    /**
+     * @param key is the key of the mapper
+     * @param values are all the values aggregated during the mapping phase
+     * @param context contains the context of the job run
+     *
+     *      PRE-CONDITION: receive a list of <"word@filename",[1, 1, 1, ...]> pairs
+     *        <"marcello@a.txt", [1, 1]>
+     *
+     *      POST-CONDITION: emit the output a single key-value where the sum of the occurrences.
+     *        <"marcello@a.txt", 2>
+     */
+    public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+ 
+        int sum = 0;
+        for (IntWritable val : values) {
+            sum += val.get();
+        }
+        //write the key and the adjusted value (removing the last comma)
+        context.write(key, new IntWritable(sum));
+    }
+}
+/*// where to put the data in hdfs when we're done
+private static final String OUTPUT_PATH = "1-word-freq";
+
+// where to read the data from.
+private static final String INPUT_PATH = "input";*/
+
+/*public int run(String[] args) throws Exception {
+
+    Configuration conf = new Configuration();
+    Job job = new Job(conf, "Word Frequence In Document");
+
+    job.setJarByClass(ReqWordCount.class);
+    job.setMapperClass(WordFrequenceInDocMapper.class);
+    job.setReducerClass(WordFrequenceInDocReducer.class);
+    job.setCombinerClass(WordFrequenceInDocReducer.class);
+
+    job.setOutputKeyClass(Text.class);
+    job.setOutputValueClass(IntWritable.class);
+
+ 
+
+    return job.waitForCompletion(true) ? 0 : 1;
+}*/
+
+public static void main(String[] args) throws Exception {
+    /*int res = ToolRunner.run(new Configuration(), new WordFrequenceInDocument(), args);
+    System.exit(res);*/
+	 Configuration conf = new Configuration();
+	    Job job = new Job(conf, "word count");
+	    job.setJarByClass(ReqWordCount.class);
+	    job.setMapperClass(WordFrequenceInDocMapper.class);
+	    //job.setCombinerClass(WordFrequenceInDocReducer.class);
+	    job.setReducerClass(WordFrequenceInDocReducer.class);
+	    job.setOutputKeyClass(Text.class);
+	    job.setOutputValueClass(IntWritable.class);
+	    FileInputFormat.addInputPath(job, new Path(args[0]));
+	    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+	    System.exit(job.waitForCompletion(true) ? 0 : 1);
+}
+
+}

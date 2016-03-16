@@ -1,0 +1,37 @@
+library(cluster)
+library(sem)
+library(Rserve)
+library(dplyr)
+library(gridBase)
+library(grid)
+library(fpc)
+tfidf<-read.table("E:/Big Data softwares/Challenge1/output.txt",header =FALSE );
+tfidf
+ctest <-cbind(tfidf$V2,tfidf$V3)
+ctest <- as.data.table(ctest)
+ctest
+head(ctest)
+clust <- kmeans(ctest,15,iter.max=1000)
+clust$centers   #$cluster to find number of clusters
+clust1 <-as.data.table(cbind(ctest$V1,ctest$V2,clust$cluster))# v1,v2,cluster ID
+clust1 # this table shows tf,idf and cluster id(tf
+colnames(clust1) <-c("tf","idf","clusterid")
+clust1
+clust2 <- cbind(clust1,tfidf$V1,tfidf$V4)
+clust2
+colnames(clust2) <-c("tf","idf","clusterid","term","tfidf")
+clust2
+
+clusters <- subset(clust2,clusterid==15)## to find  20 words with high tfidf score
+clusters  
+plot(x=clusters$V1,y=clusters$V2);
+
+
+clusters_order <-clusters[order(-tfidf),]
+top=head(clusters_order,20)
+top
+end = 0.5 + nrow(top) + nrow(top)-1 #this is the line which does the trick (together with barplot "space = 1" parameter)
+end
+barplot(top$tfidf, col="blue", main="Max 20 words in Cluster-15", ylab="tf-idf", xlab = "Word", ylim=c(0,5+max(top$tfidf)),
+        space=1)
+text(seq(1.5,end,by=2), par("usr")[3]-0.25, srt = 60, adj= 1, xpd = TRUE,labels = paste(top$term), cex=0.65)

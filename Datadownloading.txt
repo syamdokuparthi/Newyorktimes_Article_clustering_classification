@@ -1,0 +1,86 @@
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.io.File;
+import java.io.FileWriter;
+import java.util.*;
+import java.net.URL;
+import java.util.Scanner;
+import java.util.HashSet;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+public class datadownloading 
+ {	
+	public static void main(String[] args) throws Exception 
+	 {
+		int offset = 0; // syam offset for grabbing URL
+		int count = 1;  // syam count for limiting the records number and unique ID for each line
+		DateFormat name=new SimpleDateFormat("dd-MM-yy_HH-mm-ss"); 
+		Date daymonthyear=new Date(); // syam daymonthyear for getting date
+		String calendertag=name.format(daymonthyear); // syam calendertag for naming the file in correct format
+		String uniquename = "E:/Big Data softwares/Challenge1/" + calendertag + ".txt"; // syam uniquename for complete name of the file
+		System.out.println(uniquename);     // syam check console correct or not
+		File filename=new File(uniquename); // syam filename 
+		FileWriter writingtofile=new FileWriter(filename, true); // syam writingtofile for writing the scanned line to file 
+	
+		while (count > 0)  // syam be careful here you are using only count to exit the while loop
+		 {        
+			// syam be careful with the complete download link
+			String downloadlink = "http://api.nytimes.com/svc/news/v3/content/all/all/.json?limit=20&offset="+ offset + "&api-key=3847f6a6b05008a44ca617915ec8b2b6:19:70006038";
+			URL downloadurl = new URL(downloadlink);  // syam downloadurl for grabbing the URL
+
+			System.out.println(downloadlink); // syam check console correct or not
+
+			
+			try 
+			 {
+				Scanner scannedline = new Scanner(downloadurl.openStream()); // syam read data opening the download url
+				String data = new String();  
+				while (scannedline.hasNext())    // syam be carefull adding all the data till you dont have any next line
+					data += scannedline.nextLine();
+				scannedline.close();
+
+				JSONParser parser = new JSONParser();
+				JSONObject object = (JSONObject) parser.parse(data);  // syam object for parsing the total data
+				JSONArray array = (JSONArray) object.get("results");  // syam be careful ,only results are necessary
+
+				String[] onlyabstract = new String[20];  // syam dataabstract for only abstract 
+				String[] onlyurl = new String[20];       // syam dataurl for only url
+				HashSet<String> hset=new HashSet<String>(); // syam hset which is hashset for unique downloading of records
+
+				for (int i=0; i < 20 ; i++)
+
+				{
+					JSONObject onlyobject = (JSONObject) array.get(i); // syam onlyobject to get only the required data
+					onlyabstract[i] = (String) onlyobject.get("abstract"); // syam onlyabstract to get only the abstract
+					onlyurl[i] = (String) onlyobject.get("url"); // syam onlyurl to get only the url
+					if(hset.add(onlyurl[i]))  // syam here checking the urls for unique data
+					{
+					  writingtofile.write(Integer.toString(count));   // syam here writing the record id to file
+				      writingtofile.write(",");
+					  writingtofile.write("\""+onlyurl[i]+"\"");      // syam here writing url file 
+					  writingtofile.write(",");
+					  writingtofile.write("\""+onlyabstract[i]+"\""); // syam here writing abstarct to file
+					  writingtofile.write("\n");
+					  count = count + 1;
+					  if (count == 40001)     // syam be careful limiting the record count, here given value-1 will be the number of records we want
+				    	{
+					      count = 0;
+					      System.out.println("\n \nHey syam data downloading is done, go pre process it");
+					      break;
+				    	}
+					}
+				}
+
+			}		
+			catch (Exception error)
+			{
+				System.out.println(error.getMessage());
+				continue;
+			}
+			offset = offset + 20;
+		}
+		writingtofile.close();
+	}
+}
